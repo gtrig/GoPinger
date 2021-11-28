@@ -10,20 +10,20 @@ import (
 
 // A struct to hold the Host parameters.
 type Host struct {
-	ip       string
-	count    int
-	timeout  int
-	stats    *ping.Statistics
-	isActive bool
+	IP       string
+	Count    int
+	Timeout  int
+	Stats    *ping.Statistics
+	IsActive bool
 }
 
-func NewSingle(ip string, count int, timeout int) Host {
-	p := Host{ip: ip, count: count, timeout: timeout}
+func getSingle(ip string, count int, timeout int) Host {
+	p := Host{IP: ip, Count: count, Timeout: timeout}
 	return p
 }
 
 // Get a start ip and an end ip and return a slice of ping structs
-func NewRange(from string, to string, count int, timeout int) []Host {
+func getRange(from string, to string, count int, timeout int) []Host {
 	// Convert the strings to IPs
 	start := binary.BigEndian.Uint32(net.ParseIP(from).To4())
 	end := binary.BigEndian.Uint32(net.ParseIP(to).To4())
@@ -36,33 +36,35 @@ func NewRange(from string, to string, count int, timeout int) []Host {
 		ip := make(net.IP, 4)
 		binary.BigEndian.PutUint32(ip, i)
 		// Create a new ping struct
-		h := Host{ip: ip.String(), count: count, timeout: timeout}
+		h := Host{IP: ip.String(), Count: count, Timeout: timeout}
 		// Add the ping struct to the slice
 		hosts = append(hosts, h)
 	}
 	return hosts
 }
 
-// Ping the IP
-func (h *Host) InitiatePing(wg *sync.WaitGroup) {
-	pingInstance, err := ping.NewPinger(h.ip)
+// Ping a host
+func startPing(h Host, results chan<- Host, wg *sync.WaitGroup) {
+	pingInstance, err := ping.NewPinger(h.IP)
 	pingInstance.SetPrivileged(true)
 
 	if err != nil {
 		panic(err)
 	}
 
-	pingInstance.Count = h.count
+	pingInstance.Count = h.Count
 	//fmt.Printf("Pinging %s \n", h.ip)
 
 	pingInstance.OnFinish = func(stats *ping.Statistics) {
-		h.stats = pingInstance.Statistics()
+		h.Stats = pingInstance.Statistics()
 
-		if h.stats.PacketLoss == 100 {
-			h.isActive = false
+		if h.Stats.PacketLoss == 100 {
+			h.IsActive = false
 		} else {
-			h.isActive = true
+			h.IsActive = true
 		}
+
+		results <- h
 	}
 
 	pingInstance.Run() // Blocks until finished.
@@ -70,25 +72,31 @@ func (h *Host) InitiatePing(wg *sync.WaitGroup) {
 }
 
 func ScanRange(from string, to string) []Host {
-	hosts := NewRange(from, to, 20, 1)
+	hosts := getRange(from, to, 50, 1)
 
-	jobs := make(chan Host, len(hosts))
-	results := make(chan Host, len(hosts))
+	jobs := make(chan Host)
+	results := make(chan Host)
 
-	var waitgroup sync.WaitGroup
+	go worker(jobs, results)
 
 	for _, h := range hosts {
-		go h.InitiatePing()
+		jobs <- h
 	}
 
-	waitgroup.Wait()
+	close(jobs)
+
+	for a := 0; a < len(hosts); a++ {
+		hosts[a] = <-results
+	}
 
 	return hosts
 }
 
-// func worker(jobs <-chan Host, results chan<- Host) {
-// 	for j := range jobs {
-// 		j.InitiatePing(&waitgroup)
-// 		results <- j
-// 	}
-// }
+func worker(jobs <-chan Host, results chan<- Host) {
+	var wg sync.WaitGroup
+	for host := range jobs {
+		wg.Add(1)
+		go startPing(host, results, &wg)
+	}
+	wg.Wait()
+}
