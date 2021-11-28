@@ -23,8 +23,19 @@ func main() {
 	}
 	//Add the router to the API
 	api.SetApp(router)
+	printHelper()
 	//Start the API
 	log.Fatal(http.ListenAndServe(":8080", api.MakeHandler()))
+}
+
+func printHelper() {
+	fmt.Println("Server running on port 8080")
+	fmt.Println("There are two routes:")
+	fmt.Println("/ping/<ip>")
+	fmt.Println("/pingrange/<start>/<end>")
+	fmt.Println("Examples:")
+	fmt.Println("http://localhost:8080/ping/192.168.1.1")
+	fmt.Println("http://localhost:8080/pingrange/192.168.1.1/192.168.1.254")
 }
 
 func Ping(w rest.ResponseWriter, r *rest.Request) {
