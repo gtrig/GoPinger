@@ -44,7 +44,7 @@ func getRange(from string, to string, count int, timeout int) []Host {
 }
 
 // Ping a host
-func startPing(h Host, results chan<- Host, wg *sync.WaitGroup) {
+func startPing(h Host) Host {
 	pingInstance, err := ping.NewPinger(h.IP)
 	pingInstance.SetPrivileged(true)
 
@@ -63,12 +63,15 @@ func startPing(h Host, results chan<- Host, wg *sync.WaitGroup) {
 		} else {
 			h.IsActive = true
 		}
-
-		results <- h
 	}
 
 	pingInstance.Run() // Blocks until finished.
-	wg.Done()
+	return h
+}
+
+func ScanSingle(ip string) Host {
+	host := getSingle(ip, 10, 1)
+	return startPing(host)
 }
 
 func ScanRange(from string, to string) []Host {
@@ -96,7 +99,11 @@ func worker(jobs <-chan Host, results chan<- Host) {
 	var wg sync.WaitGroup
 	for host := range jobs {
 		wg.Add(1)
-		go startPing(host, results, &wg)
+		go func(host Host, results chan<- Host) {
+			defer wg.Done()
+			results <- startPing(host)
+		}(host, results)
+
 	}
 	wg.Wait()
 }
