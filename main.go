@@ -3,26 +3,49 @@ package main
 import (
 	"fmt"
 	"gopinger/lib/pinger"
-	"time"
+	"log"
+	"net/http"
+
+	"github.com/ant0ine/go-json-rest/rest"
 )
 
 func main() {
-	//s := pinger.NewSingle("192.168.8.1", 10, 1)
-	startTime := time.Now()
+	//Create a new instance of the API
+	api := rest.NewApi()
 
-	results := pinger.ScanRange("192.168.8.1", "192.168.8.254")
-
-	for _, h := range results {
-		if h.IsActive {
-			fmt.Printf("IP:%s \t MinRtt:%d \t MaxRtt: %d \t AvgRtt:%d \n", h.IP, h.Stats.MinRtt.Milliseconds(), h.Stats.MaxRtt.Milliseconds(), h.Stats.AvgRtt.Milliseconds())
-		}
+	//Create a new router
+	router, err := rest.MakeRouter(
+		rest.Get("/ping/#ip", Ping),
+		rest.Get("/pingrange/#start/#end", PingRange),
+	)
+	if err != nil {
+		log.Fatal(err)
 	}
+	//Add the router to the API
+	api.SetApp(router)
+	//Start the API
+	log.Fatal(http.ListenAndServe(":8080", api.MakeHandler()))
+}
 
-	endTime := time.Now()
-	duration := endTime.Sub(startTime)
+func Ping(w rest.ResponseWriter, r *rest.Request) {
+	//Get the IP from the request
+	ip := r.PathParam("ip")
+	log.Println(ip)
+	//Create a new instance of the ping class
+	result := pinger.ScanSingle(ip)
+	//Return the result
+	log.Println(result)
+	w.WriteJson(result)
+}
 
-	fmt.Printf("Duration: %f\n", duration.Seconds())
+func PingRange(w rest.ResponseWriter, r *rest.Request) {
+	//Get the IP from the request
+	start := r.PathParam("start")
+	end := r.PathParam("end")
+	//Create a new instance of the ping class
+	result := pinger.ScanRange(start, end)
 
-	fmt.Printf("Finished pinging %d hosts", len(results))
-
+	//Return the result
+	fmt.Println(result)
+	w.WriteJson(result)
 }

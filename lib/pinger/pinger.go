@@ -2,24 +2,40 @@ package pinger
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/go-ping/ping"
 )
 
 // A struct to hold the Host parameters.
 type Host struct {
-	IP       string
-	Count    int
-	Timeout  int
-	Stats    *ping.Statistics
-	IsActive bool
+	IP       string           `json:"ip"`
+	Count    int              `json:"count"`
+	Timeout  int              `json:"timeout"`
+	Stats    *ping.Statistics `json:"stats"`
+	IsActive bool             `json:"is_active"`
+}
+
+type ScanResult struct {
+	ActiveHosts []Host   `json:"active_hosts"`
+	Elapsed     Duration `json:"elapsed"`
+	TotalHosts  int      `json:"total_hosts"`
+	TotalActive int      `json:"total_active"`
+}
+
+type Duration struct {
+	time.Duration
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
 }
 
 func getSingle(ip string, count int, timeout int) Host {
-	p := Host{IP: ip, Count: count, Timeout: timeout}
-	return p
+	return Host{IP: ip, Count: count, Timeout: timeout}
 }
 
 // Get a start ip and an end ip and return a slice of ping structs
@@ -45,15 +61,15 @@ func getRange(from string, to string, count int, timeout int) []Host {
 
 // Ping a host
 func startPing(h Host) Host {
+
 	pingInstance, err := ping.NewPinger(h.IP)
 	pingInstance.SetPrivileged(true)
+	pingInstance.Count = h.Count
+	pingInstance.Timeout = time.Duration(h.Timeout) * time.Second
 
 	if err != nil {
 		panic(err)
 	}
-
-	pingInstance.Count = h.Count
-	//fmt.Printf("Pinging %s \n", h.ip)
 
 	pingInstance.OnFinish = func(stats *ping.Statistics) {
 		h.Stats = pingInstance.Statistics()
@@ -69,34 +85,47 @@ func startPing(h Host) Host {
 	return h
 }
 
-func ScanSingle(ip string) Host {
-	host := getSingle(ip, 10, 1)
-	return startPing(host)
+func ScanSingle(ip string) ScanResult {
+	startTime := time.Now()
+	host := getSingle(ip, 1, 1)
+	result := startPing(host)
+	endTime := time.Now()
+	elapsed := Duration{endTime.Sub(startTime)}
+
+	return ScanResult{[]Host{result}, elapsed, 1, 1}
 }
 
-func ScanRange(from string, to string) []Host {
-	hosts := getRange(from, to, 50, 1)
+func ScanRange(from string, to string) ScanResult {
+	startTime := time.Now()
+	hosts := getRange(from, to, 1, 1)
 
 	jobs := make(chan Host)
 	results := make(chan Host)
 
 	go worker(jobs, results)
 
-	for _, h := range hosts {
-		jobs <- h
+	for _, host := range hosts {
+		jobs <- host
 	}
 
 	close(jobs)
-
+	activeHosts := make([]Host, 0)
 	for a := 0; a < len(hosts); a++ {
-		hosts[a] = <-results
-	}
+		host := <-results
+		if host.IsActive {
+			activeHosts = append(activeHosts, host)
+		}
 
-	return hosts
+	}
+	endTime := time.Now()
+	elapsed := Duration{endTime.Sub(startTime)}
+
+	return ScanResult{activeHosts, elapsed, len(hosts), len(activeHosts)}
 }
 
 func worker(jobs <-chan Host, results chan<- Host) {
 	var wg sync.WaitGroup
+
 	for host := range jobs {
 		wg.Add(1)
 		go func(host Host, results chan<- Host) {
