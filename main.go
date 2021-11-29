@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"gopinger/lib/config"
 	"gopinger/lib/pinger"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 )
 
 func main() {
+	config.Init()
 	//Create a new instance of the API
 	api := rest.NewApi()
 
@@ -25,17 +27,17 @@ func main() {
 	api.SetApp(router)
 	printHelper()
 	//Start the API
-	log.Fatal(http.ListenAndServe(":8080", api.MakeHandler()))
+	log.Fatal(http.ListenAndServe(":"+config.GetString("GOPINGER_PORT"), api.MakeHandler()))
 }
 
 func printHelper() {
-	fmt.Println("Server running on port 8080")
-	fmt.Println("There are two routes:")
-	fmt.Println("/ping/<ip>")
-	fmt.Println("/pingrange/<start>/<end>")
-	fmt.Println("Examples:")
-	fmt.Println("http://localhost:8080/ping/192.168.1.1")
-	fmt.Println("http://localhost:8080/pingrange/192.168.1.1/192.168.1.254")
+	fmt.Printf("Server running on port %s\n", config.GetString("GOPINGER_PORT"))
+	fmt.Printf("There are two routes:\n")
+	fmt.Printf("/ping/<ip>\n")
+	fmt.Printf("/pingrange/<start>/<end>\n")
+	fmt.Printf("Examples:\n")
+	fmt.Printf("http://localhost:%s/ping/192.168.1.1\n", config.GetString("GOPINGER_PORT"))
+	fmt.Printf("http://localhost:%s/pingrange/192.168.1.1/192.168.1.254\n", config.GetString("GOPINGER_PORT"))
 }
 
 func Ping(w rest.ResponseWriter, r *rest.Request) {
@@ -45,7 +47,6 @@ func Ping(w rest.ResponseWriter, r *rest.Request) {
 	//Create a new instance of the ping class
 	result := pinger.ScanSingle(ip)
 	//Return the result
-	log.Println(result)
 	w.WriteJson(result)
 }
 
@@ -57,6 +58,5 @@ func PingRange(w rest.ResponseWriter, r *rest.Request) {
 	result := pinger.ScanRange(start, end)
 
 	//Return the result
-	fmt.Println(result)
 	w.WriteJson(result)
 }
