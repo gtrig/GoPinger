@@ -27,17 +27,17 @@ func main() {
 	api.SetApp(router)
 	printHelper()
 	//Start the API
-	log.Fatal(http.ListenAndServe(":"+config.GetString("GOPINGER_PORT"), api.MakeHandler()))
+	log.Fatal(http.ListenAndServe(":"+config.GetString("GOPINGER_API_PORT"), api.MakeHandler()))
 }
 
 func printHelper() {
-	fmt.Printf("Server running on port %s\n", config.GetString("GOPINGER_PORT"))
+	fmt.Printf("Server running on port %s\n", config.GetString("GOPINGER_API_PORT"))
 	fmt.Printf("There are two routes:\n")
 	fmt.Printf("/ping/<ip>\n")
 	fmt.Printf("/pingrange/<start>/<end>\n")
 	fmt.Printf("Examples:\n")
-	fmt.Printf("http://localhost:%s/ping/192.168.1.1\n", config.GetString("GOPINGER_PORT"))
-	fmt.Printf("http://localhost:%s/pingrange/192.168.1.1/192.168.1.254\n", config.GetString("GOPINGER_PORT"))
+	fmt.Printf("http://localhost:%s/ping/192.168.1.1\n", config.GetString("GOPINGER_API_PORT"))
+	fmt.Printf("http://localhost:%s/pingrange/192.168.1.1/192.168.1.254\n", config.GetString("GOPINGER_API_PORT"))
 }
 
 func Ping(w rest.ResponseWriter, r *rest.Request) {

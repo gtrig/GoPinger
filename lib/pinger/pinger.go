@@ -88,7 +88,6 @@ func startPing(h Host) Host {
 		} else {
 			h.IsActive = true
 		}
-		fmt.Printf("Pinging host %s finished \n", h.IP)
 	}
 
 	pingInstance.OnRecv = func(pkt *ping.Packet) {
