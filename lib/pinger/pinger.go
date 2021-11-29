@@ -16,8 +16,8 @@ import (
 type Host struct {
 	IP       string           `json:"ip"`
 	Count    int              `json:"count"`
-	Timeout  int              `json:"timeout"`
-	Interval int              `json:"interval"`
+	Timeout  Duration         `json:"timeout"`
+	Interval Duration         `json:"interval"`
 	Stats    *ping.Statistics `json:"stats"`
 	IsActive bool             `json:"is_active"`
 }
@@ -62,7 +62,7 @@ func getRange(from string, to string) []Host {
 	return hosts
 }
 
-// Ping a host
+// Ping a host and return a Host struct with updated stats.
 func startPing(h Host) Host {
 	config.Init()
 	pingInstance, err := ping.NewPinger(h.IP)
@@ -72,9 +72,9 @@ func startPing(h Host) Host {
 	pingInstance.Interval = time.Duration(config.GetInt("GOPINGER_INTERVAL_MS")) * time.Millisecond
 
 	h.Count = pingInstance.Count
-	h.Timeout = config.GetInt("GOPINGER_TIMEOUT_MS")
+	h.Timeout = Duration{pingInstance.Timeout}
 	h.IsActive = false
-	h.Interval = config.GetInt("GOPINGER_INTERVAL_MS")
+	h.Interval = Duration{pingInstance.Interval}
 
 	if err != nil {
 		panic(err)
@@ -98,6 +98,7 @@ func startPing(h Host) Host {
 	return h
 }
 
+//Scan a single host
 func ScanSingle(ip string) ScanResult {
 	startTime := time.Now()
 	host := getSingle(ip)
@@ -108,6 +109,7 @@ func ScanSingle(ip string) ScanResult {
 	return ScanResult{[]Host{result}, elapsed, 1, 1}
 }
 
+// Scan a range of hosts
 func ScanRange(from string, to string) ScanResult {
 	startTime := time.Now()
 	hosts := getRange(from, to)
